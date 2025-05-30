@@ -26,7 +26,7 @@ Before running Trade Master, ensure you have the following prerequisites install
 1. Clone this repository:
 
    ```bash
-   git clone https://github.com/ANANDAPADMANABHA/Trade-master.git
+   git clone
    ```
 
 2. Navigate to the project directory:
@@ -63,7 +63,7 @@ redis-server
 
 Run celery beat:
 
-before runing, run this command$env:PYTHONPATH="D:\Stocks projects\Trade-master"
+before runing, run this command  $env:PYTHONPATH="D:\Stocks projects\Trade-master"
 
 for ui: celery -A cronjobs flower
 
@@ -74,33 +74,6 @@ celery -A cronjobs beat --loglevel=info
 Run worker:
 
 ```bash
-celery -A cronjobs worker --loglevel=info
+celery -A cronjobs.celery_config worker -l info -P solo
 ```
 URL: http://localhost:5555/
-
-## Contributing
-
-Contributions are welcome! If you'd like to contribute to Trade Master, please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/new-feature`).
-3. Make your changes.
-4. Commit your changes (`git commit -am 'Add new feature'`).
-5. Push to the branch (`git push origin feature/new-feature`).
-6. Create a new Pull Request.
-
-## License
-
-[Choose a license for your project and mention it here]
-
-## Acknowledgements
-
-We would like to thank the following individuals and organizations for their contributions, support, and inspiration:
-
-- **Open-source Libraries**: We are grateful to the developers of [Library Name] for providing [description of how it helped].
-- **API Providers**: We would like to acknowledge SmartAPI for providing the API used in this project.
-- **Online Resources**: The tutorials and documentation from Angelone were instrumental in helping us understand api integration .
-
-## Contact
-
-For any inquiries or support, please contact ananthapadmanabhan012@gmail.com

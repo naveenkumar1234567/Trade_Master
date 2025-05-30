@@ -4,21 +4,27 @@ import os
 import time
 import urllib
 from typing import Dict, List, Optional, Union
-
+from dotenv import load_dotenv
+load_dotenv() 
 import pandas as pd
 from pyotp import TOTP
 from SmartApi import SmartConnect
 
 from src.trademaster.utils import token_lookup
 
-
+env_path = ".env"
 class AngelOneClient:
     def __init__(self) -> None:
         self.api_key: str = os.environ.get('API_KEY')
         self.client_id: str = os.environ.get('CLIENT_ID')
         self.password: str = os.environ.get('PASSWORD')
         self.token: str = os.environ.get('TOKEN')
-        self.totp: str = TOTP(self.token).now()
+        token = os.environ.get('TOKEN')
+        print("Token" + token)
+        self.totp: str = TOTP("VFEYK4LXWYDIEMTYLRG7LFK2SA").now()
+        print(">>> AngelOneClient MODULE LOADED "+   self.totp)
+        # self.totp: str = TOTP("VFEYK4LXWYDIEMTYLRG7LFK2SA").now()
+        print(f"CONFIG: TOTP = {self.totp}")
         self.smart_api = None
         self.instrument_list = None
 

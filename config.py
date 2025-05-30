@@ -10,9 +10,9 @@ load_dotenv()
 # password = os.environ.get('PASSWORD')
 # token = os.environ.get('TOKEN')
 
-api_key = os.environ.get('API_KEY')
-client_id = os.environ.get('CLIENT_ID')
-password = os.environ.get('PASSWORD')
+api_key = "N46Ju7kE"
+client_id = "AAAM842306"
+password = 9742
 token = os.environ.get('TOKEN')
 
 # Debugging output (visible during startup)
