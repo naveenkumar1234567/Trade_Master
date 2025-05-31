@@ -1,3 +1,13 @@
+
+# from src.trademaster.broker import AngelOneClient
+
+# client = AngelOneClient()
+# client._initialize_smart_api()  # If not already initialized
+# tickers = client.fetch_all_nse_equity_symbols()
+# ORB_TICKERS = tickers[:50]  # for example, top 50
+
+# ORB_TICKERS = ["RELIANCE"]
+
 ORB_TICKERS = [
     'POWERGRID',
     'SBIN',

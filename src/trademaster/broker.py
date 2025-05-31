@@ -1,162 +1,99 @@
+# src/trademaster/broker.py
+
 import datetime as dt
 import json
 import os
-import time
-import urllib
+import urllib.request
 from typing import Dict, List, Optional, Union
 from dotenv import load_dotenv
-load_dotenv() 
+load_dotenv()
 import pandas as pd
 from pyotp import TOTP
 from SmartApi import SmartConnect
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 from src.trademaster.utils import token_lookup
 
-env_path = ".env"
 class AngelOneClient:
     def __init__(self) -> None:
         self.api_key: str = os.environ.get('API_KEY')
         self.client_id: str = os.environ.get('CLIENT_ID')
         self.password: str = os.environ.get('PASSWORD')
         self.token: str = os.environ.get('TOKEN')
-        token = os.environ.get('TOKEN')
-        print("Token" + token)
-        self.totp: str = TOTP("VFEYK4LXWYDIEMTYLRG7LFK2SA").now()
-        print(">>> AngelOneClient MODULE LOADED "+   self.totp)
-        # self.totp: str = TOTP("VFEYK4LXWYDIEMTYLRG7LFK2SA").now()
-        print(f"CONFIG: TOTP = {self.totp}")
+        logger.info(f"Token: {self.token}")
+        self.totp: str = TOTP(self.token).now()
+        logger.info(f">>> AngelOneClient MODULE LOADED {self.totp}")
+        logger.info(f"CONFIG: TOTP = {self.totp}")
         self.smart_api = None
         self.instrument_list = None
+        self._initialize_smart_api()
 
     def _initialize_smart_api(self) -> None:
         """Initialize the SmartAPI session."""
         if self.smart_api is None:
             self.smart_api = SmartConnect(self.api_key)
-            self.smart_api.generateSession(
-                self.client_id, self.password, self.totp
-            )
+            try:
+                data = self.smart_api.generateSession(self.client_id, self.password, self.totp)
+                if data['status'] is False:
+                    logger.error(f"Authentication failed: {data['message']}")
+                    raise Exception(f"Authentication failed: {data['message']}")
+                logger.info(f"SmartAPI session initialized. Feed Token: {self.smart_api.getfeedToken()}")
+            except Exception as e:
+                logger.error(f"Failed to initialize SmartAPI: {e}")
+                self.smart_api = None
+                raise
+
+    def get_smart_api(self) -> SmartConnect:
+        """Return the SmartConnect instance."""
+        if self.smart_api is None:
+            logger.error("SmartAPI session not initialized")
+            raise ValueError("SmartAPI session not initialized")
+        return self.smart_api
 
     def _load_instrument_list(self) -> None:
         """Load the instrument list."""
         if self.instrument_list is None:
             instrument_url = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json'
-            response = urllib.request.urlopen(instrument_url)
-            self.instrument_list: List[
-                Dict[str, Union[str, int]]
-            ] = json.loads(response.read())
-
-    def quantity(self, ticker: str, exchange: str = 'NSE') -> int:
-        """Calculate the quantity of stocks to buy/sell."""
-        pos_size: int = 500
-        ltp: Optional[float] = self.get_ltp(
-            self.instrument_list, ticker, exchange
-        )
-        if ltp:
-            return int(pos_size / ltp)
-        return 0
-
-    def get_ltp(
-        self,
-        instrument_list: List[Dict[str, Union[str, int]]],
-        ticker: str,
-        exchange: str = 'NSE',
-    ) -> Optional[float]:
-        """Get the Last Traded Price (LTP) of a given ticker."""
-        params: Dict[str, Union[str, int]] = {
-            'tradingsymbol': '{}-EQ'.format(ticker),
-            'symboltoken': token_lookup(ticker, instrument_list),
-        }
-        try:
-            response = self.smart_api.ltpData(
-                exchange, params['tradingsymbol'], params['symboltoken']
-            )
-            if response:
-                return response['data']['ltp']
-        except Exception as e:
-            print(f'Exception getltp {e}')
-        return None
-
-    def place_robo_order(
-        self,
-        instrument_list: List[Dict[str, Union[str, int]]],
-        ticker: str,
-        buy_sell: str,
-        prices: List[float],
-        quantity: int,
-        exchange: str = 'NSE',
-    ) -> Optional[Dict[str, Union[str, int]]]:
-        """Place a robo order."""
-        ltp: Optional[float] = self.get_ltp(instrument_list, ticker, exchange)
-        if not ltp:
-            return None
-        params: Dict[str, Union[str, int, float]] = {
-            'variety': 'ROBO',
-            'tradingsymbol': '{}-EQ'.format(ticker),
-            'symboltoken': token_lookup(ticker, instrument_list),
-            'transactiontype': buy_sell,
-            'exchange': exchange,
-            'ordertype': 'LIMIT',
-            'producttype': 'BO',
-            'price': ltp ,
-            'duration': 'DAY',
-            'stoploss': round(ltp * 0.01, 1), 
-            'squareoff': round(ltp * 0.01, 1),
-            'quantity': quantity,
-        }
-        try:
-            response = self.smart_api.placeOrder(params)
-            return response
-        except Exception as e:
-            print(e)
-            return None
-
-    def get_open_orders(self) -> Optional[pd.DataFrame]:
-        """Retrieve open orders."""
-        try:
-            response = self.smart_api.orderBook()
-            df: pd.DataFrame = pd.DataFrame(response['data'])
-            if len(df) > 0:
-                return df[df['orderstatus'] == 'open']
-            else:
-                return None
-        except Exception as e:
-            print(e)
-            return None
-
-    def hist_data_0920(
-        self,
-        tickers: List[str],
-        duration: int,
-        interval: str,
-        instrument_list: List[Dict[str, Union[str, int]]],
-        exchange: str = 'NSE',
-    ) -> Dict[str, pd.DataFrame]:
-        """Get historical data at 9:20 am."""
-        hist_data_tickers: Dict[str, pd.DataFrame] = {}
-        for ticker in tickers:
-            time.sleep(0.4)
-            params: Dict[str, Union[str, int]] = {
-                'exchange': exchange,
-                'symboltoken': token_lookup(ticker, instrument_list),
-                'interval': interval,
-                'fromdate': (
-                    dt.date.today() - dt.timedelta(duration)
-                ).strftime('%Y-%m-%d %H:%M'),
-                'todate': dt.date.today().strftime('%Y-%m-%d') + ' 09:19',
-            }
             try:
-                hist_data = self.smart_api.getCandleData(params)
-                df_data: pd.DataFrame = pd.DataFrame(
-                    hist_data['data'],
-                    columns=['date', 'open', 'high', 'low', 'close', 'volume'],
-                )
-                df_data.set_index('date', inplace=True)
-                df_data.index = pd.to_datetime(df_data.index)
-                df_data.index = df_data.index.tz_localize(None)
-                df_data['gap'] = (
-                    (df_data['open'] / df_data['close'].shift(1)) - 1
-                ) * 100
-                hist_data_tickers[ticker] = df_data
+                response = urllib.request.urlopen(instrument_url, timeout=10)
+                self.instrument_list = json.loads(response.read())
+                logger.info(f"Loaded {len(self.instrument_list)} instruments from {instrument_url}")
             except Exception as e:
-                print(e)
-        return hist_data_tickers
+                logger.error(f"Failed to load instrument list: {e}")
+                self.instrument_list = []
+
+    def get_instrument_list(self) -> List[Dict[str, Union[str, int]]]:
+        """Public method to ensure instrument list is loaded and return it."""
+        if self.instrument_list is None:
+            logger.debug("Instrument list not loaded. Loading now...")
+            self._load_instrument_list()
+        if not self.instrument_list:
+            logger.error("Instrument list is empty after loading")
+        else:
+            logger.info(f"Returning instrument list with {len(self.instrument_list)} items")
+        return self.instrument_list
+
+    def fetch_all_nse_equity_symbols(self) -> List[str]:
+        """Fetch and return all NSE equity trading symbols."""
+        try:
+            if self.instrument_list is None:
+                self._load_instrument_list()
+            if not self.instrument_list:
+                logger.error("Instrument list is empty")
+                return []
+            logger.debug("Sample item from instrument list:")
+            logger.debug(self.instrument_list[0])
+            equity_symbols = [
+                item.get('symbol')
+                for item in self.instrument_list
+                if item.get('exch_seg') == 'NSE' and item.get('symbol', '').endswith('-EQ')
+            ]
+            logger.info(f"Fetched {len(equity_symbols)} NSE equity symbols")
+            return equity_symbols
+        except Exception as e:
+            logger.error(f"Failed to fetch NSE equity symbols: {e}")
+            return []
